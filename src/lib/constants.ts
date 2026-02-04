@@ -53,6 +53,8 @@ export const STUDY_STATUS_LABELS: Record<StudyStatusType, string> = {
 export const BUDGET_TYPES = {
   FREE: 'FREE',
   PAID: 'PAID',
+  BOOK: 'BOOK',
+  MEAL: 'MEAL',
 } as const;
 
 export type BudgetType = keyof typeof BUDGET_TYPES;
@@ -60,6 +62,23 @@ export type BudgetType = keyof typeof BUDGET_TYPES;
 export const BUDGET_LABELS: Record<BudgetType, string> = {
   FREE: '무료',
   PAID: '유료',
+  BOOK: '책',
+  MEAL: '식비',
+};
+
+// Recruitment status
+export const RECRUITMENT_STATUS = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export type RecruitmentStatusType = keyof typeof RECRUITMENT_STATUS;
+
+export const RECRUITMENT_STATUS_LABELS: Record<RecruitmentStatusType, string> = {
+  PENDING: '대기중',
+  APPROVED: '승인됨',
+  REJECTED: '거절됨',
 };
 
 // Reaction types

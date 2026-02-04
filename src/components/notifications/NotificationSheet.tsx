@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Bell, Check, MessageCircle, Heart, Megaphone, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -87,48 +87,57 @@ export function NotificationSheet({ trigger }: NotificationSheetProps) {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         {trigger}
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0">
-        <SheetHeader className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-primary" />
-              <SheetTitle>알림</SheetTitle>
-              {unreadCount > 0 && (
-                <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </div>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-80 sm:w-96 p-0 shadow-lg"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 border-b">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-sm">알림</span>
             {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead} className="gap-2">
-                <CheckCheck className="h-4 w-4" />
-                모두 읽음
-              </Button>
+              <span className="px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-medium rounded-full">
+                {unreadCount}
+              </span>
             )}
           </div>
-        </SheetHeader>
-        
-        <ScrollArea className="h-[calc(100vh-80px)]">
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="h-7 text-xs gap-1 px-2"
+            >
+              <CheckCheck className="h-3 w-3" />
+              모두 읽음
+            </Button>
+          )}
+        </div>
+
+        {/* Content */}
+        <ScrollArea className="h-[360px]">
           {isLoading ? (
             <div className="divide-y">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-start gap-4 p-4">
-                  <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-start gap-3 p-3">
+                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
                   <div className="flex-1">
-                    <div className="h-4 w-3/4 bg-muted rounded animate-pulse mb-2" />
-                    <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+                    <div className="h-3 w-3/4 bg-muted rounded animate-pulse mb-2" />
+                    <div className="h-2.5 w-16 bg-muted rounded animate-pulse" />
                   </div>
                 </div>
               ))}
             </div>
           ) : notifications.length === 0 ? (
-            <div className="text-center py-16">
-              <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">알림이 없습니다.</p>
+            <div className="text-center py-12">
+              <Bell className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">알림이 없습니다.</p>
             </div>
           ) : (
             <div className="divide-y">
@@ -143,8 +152,25 @@ export function NotificationSheet({ trigger }: NotificationSheetProps) {
             </div>
           )}
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+
+        {/* Footer */}
+        {notifications.length > 0 && (
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setOpen(false);
+                router.push('/notifications');
+              }}
+            >
+              모든 알림 보기
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -166,14 +192,14 @@ function NotificationItem({
   return (
     <div
       className={cn(
-        'flex items-start gap-4 p-4 cursor-pointer transition-colors hover:bg-muted/50',
+        'flex items-start gap-3 p-3 cursor-pointer transition-colors hover:bg-muted/50',
         !notification.isRead && 'bg-primary/5'
       )}
       onClick={onClick}
     >
       <div
         className={cn(
-          'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+          'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
           notification.type === 'LIKE' && 'bg-rose-100 text-rose-500',
           notification.type === 'COMMENT' && 'bg-blue-100 text-blue-500',
           notification.type === 'REPLY' && 'bg-blue-100 text-blue-500',
@@ -182,10 +208,10 @@ function NotificationItem({
             'bg-muted text-muted-foreground'
         )}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm', !notification.isRead && 'font-medium')}>
+        <p className={cn('text-sm leading-snug', !notification.isRead && 'font-medium')}>
           {notification.message}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
@@ -194,10 +220,10 @@ function NotificationItem({
         <Button
           variant="ghost"
           size="icon"
-          className="flex-shrink-0 h-8 w-8"
+          className="flex-shrink-0 h-6 w-6"
           onClick={onMarkAsRead}
         >
-          <Check className="h-4 w-4" />
+          <Check className="h-3 w-3" />
         </Button>
       )}
     </div>

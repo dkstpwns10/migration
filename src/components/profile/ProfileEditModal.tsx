@@ -33,19 +33,12 @@ export function ProfileEditModal({ open, onOpenChange, user }: ProfileEditModalP
   // 프로필 이미지 업로드 mutation
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      // 1. 파일 업로드
+      // 프로필 이미지 직접 업로드 (POST /users/profiles/me)
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('draftId', `profile-${user.id}-${Date.now()}`);
 
-      const uploadResponse = await api.upload<{ url: string }>('/files/upload', formData);
-
-      // 2. 프로필 업데이트 (이미지 URL 전달)
-      await api.patch('/users/profiles/me', {
-        profileImageUrl: uploadResponse.url,
-      });
-
-      return uploadResponse;
+      const response = await api.upload<Record<string, unknown>>('/users/profiles/me', formData);
+      return response;
     },
     onSuccess: async () => {
       toast.success('프로필 이미지가 변경되었습니다.');
@@ -55,7 +48,8 @@ export function ProfileEditModal({ open, onOpenChange, user }: ProfileEditModalP
     },
     onError: (error: any) => {
       console.error('Upload error:', error);
-      toast.error('프로필 이미지 변경에 실패했습니다.');
+      const errorMessage = error?.message || '프로필 이미지 변경에 실패했습니다.';
+      toast.error(errorMessage);
     },
   });
 
