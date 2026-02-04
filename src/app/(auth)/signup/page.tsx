@@ -157,7 +157,7 @@ export default function SignUp() {
                     <SelectValue placeholder="과정을 선택해주세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tracks?.map((track) => (
+                    {tracks?.map((track: { id: number; trackName: string }) => (
                       <SelectItem key={track.id} value={String(track.id)}>
                         {track.trackName}
                       </SelectItem>
