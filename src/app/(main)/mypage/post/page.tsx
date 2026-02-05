@@ -51,6 +51,7 @@ export default function MyPosts() {
     queryFn: fetchMyPosts,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.hasNext ? lastPage.nextPage : undefined),
+    staleTime: 0,
   });
 
   const posts = data?.pages.flatMap((page) => page.contents) || [];

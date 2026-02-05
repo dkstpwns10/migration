@@ -47,6 +47,11 @@ export default function PostDetail() {
   const [mentionUserIds, setMentionUserIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Debounced Like States
+  const [visualIsReacted, setVisualIsReacted] = useState<boolean | null>(null);
+  const [visualReactionCount, setVisualReactionCount] = useState<number | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const resolveImageSrc = (src: string) => {
     if (!src) return '';
     if (src.startsWith('data:') || src.startsWith('blob:')) return src;
@@ -72,7 +77,21 @@ export default function PostDetail() {
   const { data: post, isLoading: isPostLoading } = useQuery({
     queryKey: ['post', id],
     queryFn: async () => {
-      const res: any = await postApi.getPost(Number(id));
+      const [res, reactionRes] = await Promise.all([
+        postApi.getPost(Number(id)),
+        reactionApi.getPostReaction(Number(id)).catch(() => null)
+      ]);
+
+      const reactionSummary = reactionRes?.summaries?.['LIKE'];
+      const isReacted = reactionSummary?.reactedByMe || false;
+      const reactionCount = reactionSummary?.count || 0;
+
+      // Sync visual state if not currently debouncing
+      if (debounceTimerRef.current === null) {
+        setVisualIsReacted(isReacted);
+        setVisualReactionCount(reactionCount);
+      }
+
       return {
         id: res.postId,
         topic: res.topic,
@@ -85,10 +104,10 @@ export default function PostDetail() {
           trackName: res.trackName,
           profileImageUrl: res.profileImageUrl,
         },
-        reactionCount: res.reactions?.reduce((acc: number, curr: any) => acc + curr.count, 0) || 0,
+        reactionCount: reactionCount,
         commentCount: res.commentsCount,
         viewCount: 0,
-        isReacted: res.reactions?.some((r: any) => r.reactedByMe) || false,
+        isReacted: isReacted,
         isAuthor: user ? res.writerId === user.id : false,
         createdAt: res.wroteAt,
         updatedAt: res.wroteAt,
@@ -98,6 +117,7 @@ export default function PostDetail() {
       } as Post & { previousPost?: any; nextPost?: any };
     },
     enabled: !!id,
+    staleTime: 0,
   });
 
   // Fetch Comments
@@ -126,23 +146,49 @@ export default function PostDetail() {
       return res.contents.map(mapComment);
     },
     enabled: !!id,
+    staleTime: 0,
   });
 
-  // Like Post Mutation
-  const likeMutation = useMutation({
-    mutationFn: async () => {
+  // Like Post Mutation (Simple Version for Debounce)
+  const syncLikeMutation = useMutation({
+    mutationFn: async (shouldReact: boolean) => {
       if (!post) return;
-      if (post.isReacted) {
-        await reactionApi.removeReaction({ targetType: 'POST', targetId: post.id, reactionType: 'LIKE' });
-      } else {
+      if (shouldReact) {
         await reactionApi.addReaction({ targetType: 'POST', targetId: post.id, reactionType: 'LIKE' });
+      } else {
+        await reactionApi.removeReaction({ targetType: 'POST', targetId: post.id, reactionType: 'LIKE' });
       }
     },
-    onSuccess: () => {
+    onSettled: () => {
+      debounceTimerRef.current = null;
       queryClient.invalidateQueries({ queryKey: ['post', id] });
     },
-    onError: () => toast.error('좋아요 처리에 실패했습니다.'),
   });
+
+  const handleLikeClick = () => {
+    if (!post || visualIsReacted === null || visualReactionCount === null) return;
+
+    // 1. Update UI Immediately
+    const nextReacted = !visualIsReacted;
+    const nextCount = nextReacted ? visualReactionCount + 1 : visualReactionCount - 1;
+    
+    setVisualIsReacted(nextReacted);
+    setVisualReactionCount(nextCount);
+
+    // 2. Debounce Server Sync
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      // Only sync if the final state is different from the original server state
+      if (nextReacted !== post.isReacted) {
+        syncLikeMutation.mutate(nextReacted);
+      } else {
+        debounceTimerRef.current = null;
+      }
+    }, 500); // 0.5초 대기
+  };
 
   // Comment Mutation
   const commentMutation = useMutation({
@@ -267,12 +313,11 @@ export default function PostDetail() {
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="flex items-center gap-4 text-muted-foreground">
               <button
-                onClick={() => likeMutation.mutate()}
-                className={cn('flex items-center gap-1.5 text-sm transition-colors hover:text-rose-500', post.isReacted && 'text-rose-500')}
-                disabled={likeMutation.isPending}
+                onClick={handleLikeClick}
+                className={cn('flex items-center gap-1.5 text-sm transition-colors hover:text-rose-500', visualIsReacted && 'text-rose-500')}
               >
-                <Heart className={cn('h-5 w-5', post.isReacted && 'fill-current')} />
-                <span>{post.reactionCount}</span>
+                <Heart className={cn('h-5 w-5', visualIsReacted && 'fill-current')} />
+                <span>{visualReactionCount}</span>
               </button>
               <div className="flex items-center gap-1.5 text-sm">
                 <MessageCircle className="h-5 w-5" /><span>{post.commentCount}</span>
@@ -407,10 +452,51 @@ function CommentItem({ comment, postId, currentUserId, depth = 0 }: {
         await reactionApi.addReaction({ targetType: 'COMMENT', targetId: comment.id, reactionType: 'LIKE' });
       }
     },
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['comments', String(postId)] });
+      const previousComments = queryClient.getQueryData(['comments', String(postId)]);
+
+      queryClient.setQueryData(['comments', String(postId)], (old: Comment[] | undefined) => {
+        if (!old) return old;
+        return old.map((c) => {
+          if (c.id === comment.id) {
+            const wasReacted = c.isReacted;
+            return {
+              ...c,
+              isReacted: !wasReacted,
+              reactionCount: wasReacted ? c.reactionCount - 1 : c.reactionCount + 1,
+            };
+          }
+          // Handle replies if needed (nested structure)
+          if (c.replies) {
+             return {
+               ...c,
+               replies: c.replies.map(r => {
+                 if (r.id === comment.id) {
+                   const wasReacted = r.isReacted;
+                   return {
+                     ...r,
+                     isReacted: !wasReacted,
+                     reactionCount: wasReacted ? r.reactionCount - 1 : r.reactionCount + 1,
+                   };
+                 }
+                 return r;
+               })
+             };
+          }
+          return c;
+        });
+      });
+
+      return { previousComments };
+    },
+    onError: (err, newTodo, context) => {
+      queryClient.setQueryData(['comments', String(postId)], context?.previousComments);
+      toast.error('좋아요 처리에 실패했습니다.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['comments', String(postId)] });
     },
-    onError: () => toast.error('좋아요 처리에 실패했습니다.'),
   });
 
   // Comment Edit

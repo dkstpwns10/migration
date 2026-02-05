@@ -61,6 +61,7 @@ export default function StudyDetailPage() {
     queryKey: ['study', studyId],
     queryFn: () => studyApi.getStudy(studyId),
     enabled: !!studyId,
+    staleTime: 0,
   });
 
   if (isLoading) {

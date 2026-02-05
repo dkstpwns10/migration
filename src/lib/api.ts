@@ -16,6 +16,7 @@ class ApiClient {
     
     const config: RequestInit = {
       ...options,
+      cache: 'no-store', // Prevent caching
       credentials: 'include', // Required for cookie-based auth
       headers: {
         'Content-Type': 'application/json',

@@ -52,6 +52,7 @@ export default function MyComments() {
     queryFn: fetchMyComments,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.hasNext ? lastPage.nextPage : undefined),
+    staleTime: 0,
   });
 
   const comments = data?.pages.flatMap((page) => page.contents) || [];

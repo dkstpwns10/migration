@@ -30,6 +30,7 @@ export default function Notifications() {
       const res = await api.get<NotificationsResponse>('/notifications');
       return res.notifications.map(mapNotificationResponse);
     },
+    staleTime: 0,
   });
 
   const notifications = data || [];

@@ -64,6 +64,7 @@ export default function Studies() {
     queryFn: fetchStudies,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.hasNext ? lastPage.pageNumber + 1 : undefined),
+    staleTime: 0,
   });
 
   const studies = data?.pages.flatMap((page) => page.content) || [];
